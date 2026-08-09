@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dama Academy | Aprenda com a Pantera</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="theme-light">
     <div id="feedback-overlay" class="hidden">
         <div class="feedback-card">
-            <div id="panther-mascot-small"><i class="fas fa-paw" style="font-size: 2.5rem; color: var(--primary);"></i></div>
-            <h2 id="feedback-title">Boa!</h2>
-            <p id="feedback-msg">Você acertou o movimento.</p>
-            <button id="feedback-btn" class="btn-primary">Continuar</button>
+            <div id="mascot-container-feedback"></div>
+            <h2 id="feedback-title">Excelente!</h2>
+            <p id="feedback-msg">Você dominou o movimento diagonal.</p>
+            <div class="xp-badge">+<span id="xp-gain-val">0</span> XP</div>
+            <button id="feedback-btn" class="btn-primary">CONTINUAR</button>
         </div>
     </div>
 
@@ -21,20 +24,22 @@
         <header class="main-header">
             <div class="header-left">
                 <div class="logo">
-                    <span class="logo-icon"><i class="fas fa-cat"></i></span>
-                    <span class="logo-text">Dama<span>Academy</span></span>
+                    <div class="logo-icon-svg">
+                        <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#8e1616"/><circle cx="50" cy="50" r="25" fill="none" stroke="white" stroke-width="5"/></svg>
+                    </div>
+                    <span class="logo-text">DAMA<span>ACADEMY</span></span>
                 </div>
             </div>
             <div class="header-right">
-                <div class="stat-item" title="Sua sequência atual">
-                    <span class="stat-icon fire"><i class="fas fa-fire"></i></span>
-                    <span id="streak-val">0</span>
+                <div class="stat-pill streak" title="Sequência Diária">
+                    <span class="icon">🔥</span>
+                    <span id="streak-val">1</span>
                 </div>
-                <div class="stat-item" title="Seu XP total">
-                    <span class="stat-icon xp"><i class="fas fa-star"></i></span>
+                <div class="stat-pill xp" title="Experiência">
+                    <span class="icon">✨</span>
                     <span id="xp-val">0</span>
                 </div>
-                <button id="settings-btn" class="icon-btn"><i class="fas fa-cog"></i></button>
+                <button id="toggle-theme" class="icon-btn-rounded"><i class="fas fa-moon"></i></button>
             </div>
         </header>
 
@@ -43,20 +48,16 @@
 
         <nav class="bottom-nav">
             <button class="nav-item active" data-screen="learn">
-                <i class="fas fa-map-signs"></i>
-                <span>Trilha</span>
+                <div class="nav-icon"><i class="fas fa-map-marked-alt"></i></div>
+                <span>TRILHA</span>
             </button>
             <button class="nav-item" data-screen="play">
-                <i class="fas fa-gamepad"></i>
-                <span>Jogar</span>
-            </button>
-            <button class="nav-item" data-screen="academy">
-                <i class="fas fa-graduation-cap"></i>
-                <span>Academia</span>
+                <div class="nav-icon"><i class="fas fa-pawn"></i></div>
+                <span>JOGAR</span>
             </button>
             <button class="nav-item" data-screen="profile">
-                <i class="fas fa-user-circle"></i>
-                <span>Perfil</span>
+                <div class="nav-icon"><i class="fas fa-user-astronaut"></i></div>
+                <span>PERFIL</span>
             </button>
         </nav>
     </div>
