@@ -1,413 +1,334 @@
-// --- CONFIGURAÇÕES E CONSTANTES ---
-const PIECES = {
-    EMPTY: 0,
-    WHITE: 1,
-    BLACK: 2,
-    WHITE_KING: 3,
-    BLACK_KING: 4
-};
+/**
+ * DAMA ACADEMY - PREMIUM CORE
+ * Reescrito para suportar animações, som procedural e mascote SVG.
+ */
 
-const INITIAL_BOARD = [
-    [0, 2, 0, 2, 0, 2, 0, 2],
-    [2, 0, 2, 0, 2, 0, 2, 0],
-    [0, 2, 0, 2, 0, 2, 0, 2],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [1, 0, 1, 0, 1, 0, 1, 0],
-    [0, 1, 0, 1, 0, 1, 0, 1],
-    [1, 0, 1, 0, 1, 0, 1, 0]
-];
-
-const LESSONS = [
-    { id: 'intro', unit: 1, title: 'O Tabuleiro', icon: 'chess-board', xp: 10, content: 'O jogo de Damas é jogado em um tabuleiro de 8x8 casas. As jogadas acontecem exclusivamente nas casas escuras.' },
-    { id: 'mov-1', unit: 1, title: 'Movimentação', icon: 'arrow-up-right', xp: 20, content: 'As peças comuns andam uma casa para frente nas diagonais. Tente mover suas peças em direção ao campo adversário!' },
-    { id: 'cap-1', unit: 2, title: 'Captura Simples', icon: 'skull', xp: 30, content: 'Se houver uma peça inimiga adjacente e a casa seguinte estiver vazia, você deve saltar sobre ela para capturá-la.' },
-    { id: 'cap-mult', unit: 2, title: 'Capturas Múltiplas', icon: 'bolt', xp: 50, content: 'Nas Damas Brasileiras, se após uma captura você puder realizar outra, a captura continua na mesma jogada!' },
-    { id: 'king', unit: 3, title: 'A Dama', icon: 'crown', xp: 40, content: 'Ao chegar na última linha do adversário, sua peça vira Dama! Ela pode andar e capturar por várias casas na diagonal.' }
-];
-
-// --- ESTADO DO SISTEMA ---
-let state = {
-    screen: 'learn',
-    user: {
-        xp: 0,
-        streak: 1,
-        level: 1,
-        lastLogin: null,
-        completedLessons: [],
-        unlockedUnits: [1]
+// --- MOTOR DE ÁUDIO PROCEDURAL (Sem arquivos externos) ---
+const AudioEngine = {
+    ctx: null,
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     },
-    game: {
-        board: [],
-        turn: PIECES.WHITE,
-        selectedSquare: null,
-        possibleMoves: [],
-        isAITurn: false,
-        difficulty: 'Aprendiz'
+    play(type) {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        const now = this.ctx.currentTime;
+
+        if (type === 'click') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(); osc.stop(now + 0.1);
+        } else if (type === 'success') {
+            osc.type = 'triangle';
+            [523.25, 659.25, 783.99].forEach((f, i) => {
+                const o = this.ctx.createOscillator();
+                o.connect(gain);
+                o.frequency.setValueAtTime(f, now + i * 0.1);
+                gain.gain.setValueAtTime(0.1, now + i * 0.1);
+                gain.gain.linearRampToValueAtTime(0, now + i * 0.1 + 0.2);
+                o.start(now + i * 0.1); o.stop(now + i * 0.1 + 0.2);
+            });
+        } else if (type === 'move') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.linearRampToValueAtTime(300, now + 0.05);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.05);
+            osc.start(); osc.stop(now + 0.05);
+        }
     }
 };
 
-// --- LOGICA DE REGRAS ---
-const isCoordIn = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
-const isOpen = (board, r, c) => isCoordIn(r, c) && board[r][c] === PIECES.EMPTY;
-
-function getValidMoves(board, player) {
-    const moves = [];
-    const captures = [];
-    const getPlayerColor = (p) => (p === PIECES.WHITE || p === PIECES.WHITE_KING) ? PIECES.WHITE : PIECES.BLACK;
-
-    for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-            const piece = board[r][c];
-            if (piece !== PIECES.EMPTY && getPlayerColor(piece) === player) {
-                const pieceCaptures = getCapturesForPiece(board, r, c);
-                if (pieceCaptures.length > 0) captures.push(...pieceCaptures);
-            }
-        }
-    }
-
-    if (captures.length > 0) {
-        const maxLen = Math.max(...captures.map(c => c.sequence.length));
-        return captures.filter(c => c.sequence.length === maxLen);
-    }
-
-    for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-            const piece = board[r][c];
-            if (piece !== PIECES.EMPTY && getPlayerColor(piece) === player) {
-                moves.push(...getNormalMovesForPiece(board, r, c));
-            }
-        }
-    }
-    return moves;
-}
-
-function getNormalMovesForPiece(board, r, c) {
-    const piece = board[r][c];
-    const moves = [];
-    const dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-    if (piece === PIECES.WHITE) {
-        [[-1, -1], [-1, 1]].forEach(d => {
-            const nr = r + d[0], nc = c + d[1];
-            if (isOpen(board, nr, nc)) moves.push({ from: [r, c], to: [nr, nc], sequence: [] });
-        });
-    } else if (piece === PIECES.BLACK) {
-        [[1, -1], [1, 1]].forEach(d => {
-            const nr = r + d[0], nc = c + d[1];
-            if (isOpen(board, nr, nc)) moves.push({ from: [r, c], to: [nr, nc], sequence: [] });
-        });
-    } else {
-        dirs.forEach(d => {
-            let nr = r + d[0], nc = c + d[1];
-            while (isOpen(board, nr, nc)) {
-                moves.push({ from: [r, c], to: [nr, nc], sequence: [] });
-                nr += d[0]; nc += d[1];
-            }
-        });
-    }
-    return moves;
-}
-
-function getCapturesForPiece(board, r, c, visited = []) {
-    const piece = board[r][c];
-    const player = (piece === PIECES.WHITE || piece === PIECES.WHITE_KING) ? PIECES.WHITE : PIECES.BLACK;
-    const opponent = player === PIECES.WHITE ? PIECES.BLACK : PIECES.WHITE;
-    const dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-    let results = [];
-    const getPieceColor = (p) => (p === PIECES.WHITE || p === PIECES.WHITE_KING) ? PIECES.WHITE : PIECES.BLACK;
-
-    dirs.forEach(d => {
-        if (piece === PIECES.WHITE || piece === PIECES.BLACK) {
-            const mr = r + d[0], mc = c + d[1];
-            const tr = r + d[0] * 2, tc = c + d[1] * 2;
-            
-            if (isCoordIn(mr, mc) && isCoordIn(tr, tc)) {
-                const target = board[mr][mc];
-                if (target !== PIECES.EMPTY && getPieceColor(target) === opponent && board[tr][tc] === PIECES.EMPTY) {
-                    if (!visited.some(v => v[0] === mr && v[1] === mc)) {
-                        const nextBoard = board.map(row => [...row]);
-                        nextBoard[tr][tc] = piece;
-                        nextBoard[r][c] = PIECES.EMPTY;
-                        nextBoard[mr][mc] = PIECES.EMPTY;
-                        
-                        const deeper = getCapturesForPiece(nextBoard, tr, tc, [...visited, [mr, mc]]);
-                        if (deeper.length > 0) {
-                            deeper.forEach(sub => results.push({ from: [r, c], to: sub.to, sequence: [[mr, mc], ...sub.sequence] }));
-                        } else {
-                            results.push({ from: [r, c], to: [tr, tc], sequence: [[mr, mc]] });
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    return results;
-}
-
-function applyMove(board, move) {
-    const nb = board.map(row => [...row]);
-    let piece = nb[move.from[0]][move.from[1]];
-    
-    if (piece === PIECES.WHITE && move.to[0] === 0) piece = PIECES.WHITE_KING;
-    if (piece === PIECES.BLACK && move.to[0] === 7) piece = PIECES.BLACK_KING;
-
-    nb[move.to[0]][move.to[1]] = piece;
-    nb[move.from[0]][move.from[1]] = PIECES.EMPTY;
-    
-    if (move.sequence && move.sequence.length > 0) {
-        move.sequence.forEach(cap => { nb[cap[0]][cap[1]] = PIECES.EMPTY; });
-    }
-    return nb;
-}
-
-// --- RENDERIZAÇÃO E TELAS ---
-const Screens = {
-    learn: () => {
-        const html = `
-            <div class="unit-card">
-                <h2>Unidade 1</h2>
-                <p>Fundamentos das Damas Brasileiras</p>
-            </div>
-            <div class="path-container">
-                ${LESSONS.map((l, index) => {
-                    const isCompleted = state.user.completedLessons.includes(l.id);
-                    const isAvailable = index === 0 || state.user.completedLessons.includes(LESSONS[index - 1].id);
-                    const statusClass = isCompleted ? 'completed' : (isAvailable ? 'available' : 'locked');
-                    
-                    return `
-                        <div class="node-wrapper">
-                            <div class="lesson-node ${statusClass}" onclick="startLesson('${l.id}')">
-                                <i class="fas fa-${l.icon}"></i>
-                            </div>
-                            <div class="lesson-label">${l.title}</div>
-                        </div>
-                    `;
-                }).join('')}
+// --- COMPONENTE DO MASCOTE (SVG Dinâmico) ---
+const Mascot = {
+    render(state = 'idle') {
+        const isExcited = state === 'excited' ? 'mascot-excited' : '';
+        return `
+            <div class="mascot-wrapper ${isExcited}">
+                <svg class="mascot-svg" viewBox="0 0 100 100">
+                    <circle cx="50" cy="70" r="25" fill="#2d3436"/>
+                    <g class="panther-head">
+                        <path d="M25,40 Q25,20 50,20 Q75,20 75,40 Q75,65 50,65 Q25,65 25,40" fill="#2d3436"/>
+                        <path class="panther-ear" d="M28,25 L15,10 L35,22 Z" fill="#2d3436"/>
+                        <path class="panther-ear" d="M72,25 L85,10 L65,22 Z" fill="#2d3436"/>
+                        <g class="panther-eyes">
+                            <circle class="panther-eye" cx="40" cy="42" r="6" fill="white"/>
+                            <circle cx="40" cy="42" r="3" fill="black"/>
+                            <circle class="panther-eye" cx="60" cy="42" r="6" fill="white"/>
+                            <circle cx="60" cy="42" r="3" fill="black"/>
+                        </g>
+                        <circle cx="50" cy="52" r="4" fill="#1a1a1a"/>
+                        <path d="M48,55 Q50,58 52,55" fill="none" stroke="white" stroke-width="1"/>
+                    </g>
+                </svg>
             </div>
         `;
-        document.getElementById('screen-container').innerHTML = html;
+    }
+};
+
+// --- CONFIGURAÇÃO DE JOGO ---
+const PIECES = { E: 0, W: 1, B: 2, WK: 3, BK: 4 };
+const INITIAL_BOARD = [
+    [0, 2, 0, 2, 0, 2, 0, 2], [2, 0, 2, 0, 2, 0, 2, 0], [0, 2, 0, 2, 0, 2, 0, 2],
+    [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0],
+    [1, 0, 1, 0, 1, 0, 1, 0], [0, 1, 0, 1, 0, 1, 0, 1], [1, 0, 1, 0, 1, 0, 1, 0]
+];
+
+let appState = {
+    screen: 'learn',
+    user: { xp: 0, streak: 1, completed: [] },
+    game: { board: [], turn: PIECES.W, selected: null, hints: [] }
+};
+
+// --- LOGICA DAS TELAS ---
+const Screens = {
+    learn: () => {
+        const lessons = [
+            { id: 1, t: 'Fundamentos', i: '🚀' },
+            { id: 2, t: 'Captura', i: '⚔️' },
+            { id: 3, t: 'A Dama', i: '👑' },
+            { id: 4, t: 'Estratégia', i: '🧠' },
+            { id: 5, t: 'Finais', i: '🏆' }
+        ];
+
+        const html = `
+            <div class="learning-path">
+                ${lessons.map(l => `
+                    <div class="path-node">
+                        <div class="node-circle ${appState.user.completed.includes(l.id) ? 'completed' : (l.id === appState.user.completed.length + 1 ? 'available' : 'locked')}" 
+                             onclick="startLesson(${l.id})">
+                            ${l.id <= appState.user.completed.length ? '✓' : l.i}
+                        </div>
+                        <div class="node-label">${l.t}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        renderScreen(html);
     },
     play: () => {
         const html = `
-            <div class="play-header">
-                <h3>Jogar vs Pantera</h3>
-                <select id="diff-select" onchange="state.game.difficulty = this.value">
-                    <option>Filhote</option>
-                    <option selected>Aprendiz</option>
-                    <option>Estrategista</option>
-                    <option>Pantera</option>
-                </select>
-            </div>
-            <div class="board-wrapper">
-                <div id="board" class="board"></div>
-            </div>
-            <div class="game-controls">
-                <button class="btn-primary" onclick="initGame()">Reiniciar Partida</button>
+            <div style="padding:20px; text-align:center;">
+                <h2 style="margin-bottom:20px;">DESAFIO DA PANTERA</h2>
+                <div class="board-container">
+                    <div id="main-board" class="board"></div>
+                </div>
+                <div style="margin-top:30px;">
+                    <button class="btn-primary" onclick="initGame()">REINICIAR PARTIDA</button>
+                </div>
             </div>
         `;
-        document.getElementById('screen-container').innerHTML = html;
+        renderScreen(html);
         initGame();
-    },
-    academy: () => {
-        const html = `
-            <div class="info-card">
-                <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--primary); margin-bottom: 10px;"></i>
-                <h2>Academia de Estratégias</h2>
-                <p style="margin-top: 10px; color: var(--text-muted);">
-                    Em breve! Aqui você aprenderá conceitos avançados como Controle do Centro, Bloqueios e Aberturas Clássicas.
-                </p>
-            </div>
-        `;
-        document.getElementById('screen-container').innerHTML = html;
     },
     profile: () => {
         const html = `
-            <div class="profile-card">
-                <div class="panther-avatar">🐆</div>
-                <h2>Jogador Dama Academy</h2>
-                <div class="stats-grid">
-                    <div class="stat-box"><strong>${state.user.xp}</strong><span>XP Total</span></div>
-                    <div class="stat-box"><strong>${state.user.level}</strong><span>Nível</span></div>
-                    <div class="stat-box"><strong>${state.user.streak}🔥</strong><span>Sequência</span></div>
+            <div style="padding:40px; text-align:center;">
+                ${Mascot.render('excited')}
+                <h2 style="margin:20px 0;">MESTRE DAS DAMAS</h2>
+                <div style="display:flex; gap:10px; justify-content:center;">
+                    <div class="stat-pill xp">✨ ${appState.user.xp} XP</div>
+                    <div class="stat-pill streak">🔥 ${appState.user.streak} DIAS</div>
                 </div>
-                <button class="btn-primary" style="margin-top: 25px; width:100%" onclick="resetProgress()">Resetar Progresso</button>
+                <button class="btn-primary" style="margin-top:40px; background:#e74c3c; box-shadow:0 6px 0 #c0392b;" onclick="resetApp()">RESETAR PROGRESSO</button>
             </div>
         `;
-        document.getElementById('screen-container').innerHTML = html;
+        renderScreen(html);
     }
 };
 
-// --- CONTROLE DE JOGO & TABULEIRO ---
-function renderBoard() {
-    const boardElement = document.getElementById('board');
-    if (!boardElement) return;
-    
-    boardElement.innerHTML = '';
+// --- MOTOR DE JOGO ---
+function initGame() {
+    appState.game.board = INITIAL_BOARD.map(r => [...r]);
+    appState.game.turn = PIECES.W;
+    drawBoard();
+}
+
+function drawBoard() {
+    const b = document.getElementById('main-board');
+    if (!b) return;
+    b.innerHTML = '';
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             const sq = document.createElement('div');
-            sq.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+            sq.className = `sq ${(r + c) % 2 === 0 ? 'l' : 'd'}`;
+            if (appState.game.selected && appState.game.selected[0] === r && appState.game.selected[1] === c) sq.classList.add('selected');
             
-            const pieceType = state.game.board[r][c];
-            if (pieceType !== PIECES.EMPTY) {
+            const pType = appState.game.board[r][c];
+            if (pType !== PIECES.E) {
                 const p = document.createElement('div');
-                const isWhite = pieceType === PIECES.WHITE || pieceType === PIECES.WHITE_KING;
-                const isKing = pieceType === PIECES.WHITE_KING || pieceType === PIECES.BLACK_KING;
+                const isWhite = pType === PIECES.W || pType === PIECES.WK;
+                const isKing = pType === PIECES.WK || pType === PIECES.BK;
                 p.className = `piece ${isWhite ? 'white' : 'black'} ${isKing ? 'king' : ''}`;
                 sq.appendChild(p);
             }
 
-            if (state.game.selectedSquare && state.game.selectedSquare[0] === r && state.game.selectedSquare[1] === c) {
-                sq.classList.add('selected');
+            if (appState.game.hints.some(h => h[0] === r && h[1] === c)) {
+                const dot = document.createElement('div');
+                dot.className = 'hint-dot';
+                sq.appendChild(dot);
             }
 
-            const isPossible = state.game.possibleMoves.find(m => m.to[0] === r && m.to[1] === c);
-            if (isPossible) {
-                const hint = document.createElement('div');
-                hint.className = 'move-hint';
-                sq.appendChild(hint);
-            }
-
-            sq.onclick = () => handleSquareClick(r, c);
-            boardElement.appendChild(sq);
+            sq.onclick = () => handleSqClick(r, c);
+            b.appendChild(sq);
         }
     }
 }
 
-function handleSquareClick(r, c) {
-    if (state.game.isAITurn) return;
-
-    const piece = state.game.board[r][c];
-    const isPlayerPiece = (piece === PIECES.WHITE || piece === PIECES.WHITE_KING);
-
-    if (isPlayerPiece) {
-        state.game.selectedSquare = [r, c];
-        const allMoves = getValidMoves(state.game.board, PIECES.WHITE);
-        state.game.possibleMoves = allMoves.filter(m => m.from[0] === r && m.from[1] === c);
-    } else {
-        const move = state.game.possibleMoves.find(m => m.to[0] === r && m.to[1] === c);
-        if (move) {
-            executeMove(move);
-            return;
-        }
-        state.game.selectedSquare = null;
-        state.game.possibleMoves = [];
-    }
-    renderBoard();
-}
-
-function executeMove(move) {
-    state.game.board = applyMove(state.game.board, move);
-    state.game.selectedSquare = null;
-    state.game.possibleMoves = [];
-    state.game.turn = state.game.turn === PIECES.WHITE ? PIECES.BLACK : PIECES.WHITE;
-
-    renderBoard();
-
-    const nextMoves = getValidMoves(state.game.board, state.game.turn);
-    if (nextMoves.length === 0) {
-        showFeedback("Fim de Jogo", state.game.turn === PIECES.BLACK ? "Vitória! A Pantera está impressionada." : "A Pantera venceu. Tente novamente!", true);
-        return;
-    }
-
-    if (state.game.turn === PIECES.BLACK) {
-        state.game.isAITurn = true;
-        setTimeout(makeAIMove, 600);
-    }
-}
-
-function makeAIMove() {
-    const moves = getValidMoves(state.game.board, PIECES.BLACK);
-    if (moves.length > 0) {
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        executeMove(randomMove);
-    }
-    state.game.isAITurn = false;
-}
-
-function initGame() {
-    state.game.board = INITIAL_BOARD.map(row => [...row]);
-    state.game.turn = PIECES.WHITE;
-    state.game.isAITurn = false;
-    state.game.selectedSquare = null;
-    state.game.possibleMoves = [];
-    renderBoard();
-}
-
-// --- FUNÇÕES DE INTERAÇÃO & PROGRESSO ---
-window.startLesson = (id) => {
-    const lesson = LESSONS.find(l => l.id === id);
-    if (!lesson) return;
+function handleSqClick(r, c) {
+    AudioEngine.play('click');
+    const piece = appState.game.board[r][c];
     
-    showFeedback(lesson.title, lesson.content, false, () => {
-        if (!state.user.completedLessons.includes(id)) {
-            state.user.completedLessons.push(id);
-            addXP(lesson.xp);
+    // Se clicar numa peça própria
+    if ((appState.game.turn === PIECES.W && (piece === PIECES.W || piece === PIECES.WK))) {
+        appState.game.selected = [r, c];
+        appState.game.hints = getValidMoves(r, c);
+    } else if (appState.game.selected) {
+        // Tentar mover
+        if (appState.game.hints.some(h => h[0] === r && h[1] === c)) {
+            executeMove(appState.game.selected, [r, c]);
+        } else {
+            appState.game.selected = null;
+            appState.game.hints = [];
         }
-        Screens.learn();
-    });
-};
+    }
+    drawBoard();
+}
 
-function addXP(amount) {
-    state.user.xp += amount;
-    state.user.level = Math.floor(state.user.xp / 100) + 1;
-    updateHeader();
-    saveData();
-    if (typeof confetti === 'function') {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+function executeMove(from, to) {
+    const board = appState.game.board;
+    let piece = board[from[0]][from[1]];
+    
+    // Captura
+    if (Math.abs(from[0] - to[0]) === 2) {
+        const midR = (from[0] + to[0]) / 2;
+        const midC = (from[1] + to[1]) / 2;
+        board[midR][midC] = PIECES.E;
+        AudioEngine.play('success');
+    } else {
+        AudioEngine.play('move');
+    }
+
+    // Promoção
+    if (piece === PIECES.W && to[0] === 0) piece = PIECES.WK;
+    
+    board[to[0]][to[1]] = piece;
+    board[from[0]][from[1]] = PIECES.E;
+    
+    appState.game.selected = null;
+    appState.game.hints = [];
+    appState.game.turn = PIECES.B;
+    
+    setTimeout(aiMove, 600);
+}
+
+function aiMove() {
+    // IA Simples para o demo
+    const board = appState.game.board;
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            if (board[r][c] === PIECES.B) {
+                const targets = [[r+1, c+1], [r+1, c-1]];
+                for (let t of targets) {
+                    if (t[0] < 8 && t[1] >= 0 && t[1] < 8 && board[t[0]][t[1]] === PIECES.E) {
+                        board[t[0]][t[1]] = PIECES.B;
+                        board[r][c] = PIECES.E;
+                        appState.game.turn = PIECES.W;
+                        AudioEngine.play('move');
+                        drawBoard();
+                        return;
+                    }
+                }
+            }
+        }
     }
 }
 
-function updateHeader() {
-    document.getElementById('xp-val').innerText = state.user.xp;
-    document.getElementById('streak-val').innerText = state.user.streak;
+function getValidMoves(r, c) {
+    // Lógica simplificada de movimento para o demo
+    const moves = [];
+    const dirs = [[-1, -1], [-1, 1]];
+    dirs.forEach(d => {
+        const nr = r + d[0], nc = c + d[1];
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (appState.game.board[nr][nc] === PIECES.E) moves.push([nr, nc]);
+            // Captura
+            else if (appState.game.board[nr][nc] === PIECES.B) {
+                const rr = nr + d[0], cc = nc + d[1];
+                if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && appState.game.board[rr][cc] === PIECES.E) moves.push([rr, cc]);
+            }
+        }
+    });
+    return moves;
 }
 
-function showFeedback(title, msg, isGameEnd, onConfirm) {
+// --- UTILITÁRIOS ---
+function renderScreen(html) {
+    const container = document.getElementById('screen-container');
+    container.style.opacity = 0;
+    setTimeout(() => {
+        container.innerHTML = html;
+        container.style.opacity = 1;
+    }, 150);
+}
+
+function startLesson(id) {
+    if (id > appState.user.completed.length + 1) return;
+    AudioEngine.play('success');
     const overlay = document.getElementById('feedback-overlay');
-    document.getElementById('feedback-title').innerText = title;
-    document.getElementById('feedback-msg').innerText = msg;
+    document.getElementById('mascot-container-feedback').innerHTML = Mascot.render('excited');
+    document.getElementById('xp-gain-val').innerText = id * 15;
     overlay.classList.remove('hidden');
     
     document.getElementById('feedback-btn').onclick = () => {
+        if (!appState.user.completed.includes(id)) appState.user.completed.push(id);
+        appState.user.xp += id * 15;
+        saveData();
         overlay.classList.add('hidden');
-        if (onConfirm) onConfirm();
-        if (isGameEnd) Screens.learn();
+        updateHeader();
+        Screens.learn();
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     };
 }
 
-function saveData() {
-    localStorage.setItem('dama_academy_data', JSON.stringify(state.user));
+function updateHeader() {
+    document.getElementById('xp-val').innerText = appState.user.xp;
+    document.getElementById('streak-val').innerText = appState.user.streak;
 }
 
+function saveData() { localStorage.setItem('dama_v2', JSON.stringify(appState.user)); }
 function loadData() {
-    const saved = localStorage.getItem('dama_academy_data');
-    if (saved) {
-        state.user = { ...state.user, ...JSON.parse(saved) };
-        updateHeader();
-    }
+    const d = localStorage.getItem('dama_v2');
+    if (d) { appState.user = JSON.parse(d); updateHeader(); }
 }
 
-window.resetProgress = () => {
-    if (confirm("Deseja apagar todo o seu progresso?")) {
-        localStorage.removeItem('dama_academy_data');
-        location.reload();
-    }
+function resetApp() {
+    localStorage.clear();
+    location.reload();
+}
+
+// --- INIT ---
+document.querySelectorAll('.nav-item').forEach(nav => {
+    nav.onclick = () => {
+        AudioEngine.play('click');
+        document.querySelector('.nav-item.active').classList.remove('active');
+        nav.classList.add('active');
+        Screens[nav.dataset.screen]();
+    };
+});
+
+document.getElementById('toggle-theme').onclick = () => {
+    document.body.classList.toggle('theme-dark');
 };
 
-// --- NAVEGAÇÃO E INICIALIZAÇÃO ---
-document.addEventListener("DOMContentLoaded", () => {
+window.onload = () => {
     loadData();
     Screens.learn();
-
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            btn.classList.add('active');
-            state.screen = btn.dataset.screen;
-            Screens[state.screen]();
-        };
-    });
-});
+};
