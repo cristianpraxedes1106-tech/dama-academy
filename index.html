@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dama Academy | Aprenda com a Pantera</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="theme-light">
+    <div id="feedback-overlay" class="hidden">
+        <div class="feedback-card">
+            <div id="panther-mascot-small"><i class="fas fa-paw" style="font-size: 2.5rem; color: var(--primary);"></i></div>
+            <h2 id="feedback-title">Boa!</h2>
+            <p id="feedback-msg">Você acertou o movimento.</p>
+            <button id="feedback-btn" class="btn-primary">Continuar</button>
+        </div>
+    </div>
+
+    <div id="app">
+        <header class="main-header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon"><i class="fas fa-cat"></i></span>
+                    <span class="logo-text">Dama<span>Academy</span></span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="stat-item" title="Sua sequência atual">
+                    <span class="stat-icon fire"><i class="fas fa-fire"></i></span>
+                    <span id="streak-val">0</span>
+                </div>
+                <div class="stat-item" title="Seu XP total">
+                    <span class="stat-icon xp"><i class="fas fa-star"></i></span>
+                    <span id="xp-val">0</span>
+                </div>
+                <button id="settings-btn" class="icon-btn"><i class="fas fa-cog"></i></button>
+            </div>
+        </header>
+
+        <main id="screen-container">
+            </main>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-screen="learn">
+                <i class="fas fa-map-signs"></i>
+                <span>Trilha</span>
+            </button>
+            <button class="nav-item" data-screen="play">
+                <i class="fas fa-gamepad"></i>
+                <span>Jogar</span>
+            </button>
+            <button class="nav-item" data-screen="academy">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Academia</span>
+            </button>
+            <button class="nav-item" data-screen="profile">
+                <i class="fas fa-user-circle"></i>
+                <span>Perfil</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
